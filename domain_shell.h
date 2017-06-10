@@ -20,6 +20,7 @@
 #include <thread>
 #include <iostream>
 #include <functional>
+#include <mutex>
 
 class Unix_Socket
 {
@@ -123,7 +124,7 @@ public:
     auto ret = close(m_fd);
     if( ret == -1)
     {
-        std::cout << "Error closing socket" << std::endl;
+        //std::cout << "Error closing socket" << std::endl;
     }
     m_fd = -1;
     return true;
@@ -153,7 +154,7 @@ public:
 
     ~DomainShell()
     {
-        std::cout << "Destroying" << std::endl;
+        //std::cout << "Destroying" << std::endl;
         __disconnect();
         Unlink();
     }
@@ -220,7 +221,22 @@ private:
            // Client.Write(buffer, ret);
         }
         Client.Close();
+        __erase_client(p_Client);
         //std::cout << "Client disconnected" << std::endl;
+    }
+
+    void __erase_client(Unix_Socket * p)
+    {
+        m_Mutex.lock();
+        for(int i=0; i < m_Clients.size();i++)
+        {
+            if(&m_Clients[i]->second == p)
+            {
+                std::swap( m_Clients[i] , m_Clients.back() );
+                m_Clients.pop_back();
+            }
+        }
+        m_Mutex.unlock();
     }
 
     void __listen()
@@ -246,23 +262,25 @@ private:
 
           client->first  = std::move(tc);
 
+          m_Mutex.lock();
           m_Clients.push_back( client );
+          m_Mutex.unlock();
         }
 
-        std::cout << "Listen thread exited" << std::endl;
+        //std::cout << "Listen thread exited" << std::endl;
 
     }
 
+
     void __disconnect()
     {
-
         m_exit = true;
 
         int i=0;
 
         for(auto & c : m_Clients)
         {
-            std::cout << "Disconnecting client " << i++ << std::endl;
+            //std::cout << "Disconnecting client " << i++ << std::endl;
             c->second.Close();
             if(c->first.joinable())
                 c->first.join();
@@ -270,7 +288,7 @@ private:
             delete(c);
         }
 
-        std::cout << "Closing Listen socket" << std::endl;
+        //std::cout << "Closing Listen socket" << std::endl;
         m_Socket.Shutdown();
 
         if(m_ListenThread.joinable() )
@@ -283,7 +301,7 @@ private:
     std::thread m_ListenThread;
     std::string m_Name;
     bool m_exit = false;
-
+    std::mutex m_Mutex;
     std::vector<pair_t*> m_Clients;
     map_t m_cmds;
 };
