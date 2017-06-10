@@ -18,7 +18,6 @@
 #include <map>
 #include <string>
 #include <thread>
-#include <iostream>
 #include <functional>
 #include <mutex>
 
@@ -135,7 +134,7 @@ public:
       return m_fd != -1;
   }
 
-private:
+public:
   struct sockaddr_un m_name;
   int                m_fd = -1;
 };
@@ -144,8 +143,11 @@ class DomainShell
 {
 public:
     Unix_Socket m_Socket;
-    using function_t = std::function<void(Unix_Socket&,char const * args)>;
-    using map_t      = std::map<std::string, function_t >;
+
+    using cmdfunction_t = std::function<void(Unix_Socket&,char const * args)>;
+    using connectfunction_t = std::function<void(Unix_Socket&)>;
+    using disconnectfunction_t = std::function<void(Unix_Socket&)>;
+    using map_t      = std::map<std::string, cmdfunction_t >;
 
     DomainShell()
     {
@@ -177,7 +179,18 @@ public:
     }
 
 
-    void AddCommand(std::string const & s, function_t f)
+
+    void AddOnConnect( connectfunction_t f)
+    {
+        on_Connect = f;
+    }
+
+    void AddOnDisconnect( disconnectfunction_t f)
+    {
+        on_Disconnect = f;
+    }
+
+    void AddCommand(std::string const & s, cmdfunction_t f)
     {
         m_cmds[s] = f;
     }
@@ -208,6 +221,10 @@ private:
         //std::cout << "Client Connected" << std::endl;
         char buffer[256];
 
+        auto old_client = *p_Client;
+        if( on_Connect )
+            on_Connect(*p_Client);
+
         while( Client && !m_exit)
         {
             auto ret = Client.Read(buffer, 255);
@@ -220,6 +237,10 @@ private:
             parse(buffer, Client);
            // Client.Write(buffer, ret);
         }
+
+        if(on_Disconnect)
+            on_Disconnect(old_client);
+
         Client.Close();
         __erase_client(p_Client);
         //std::cout << "Client disconnected" << std::endl;
@@ -304,6 +325,8 @@ private:
     std::mutex m_Mutex;
     std::vector<pair_t*> m_Clients;
     map_t m_cmds;
+    connectfunction_t on_Connect;
+    disconnectfunction_t on_Disconnect;
 };
 #else
     #error User a proper operating system!
