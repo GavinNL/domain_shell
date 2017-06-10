@@ -19,4 +19,4 @@ See the main.cpp example
 
 ## Task List ##
 
-[ ] - Add option to create set a callback function for when a client connects or disconnects.
+- [ ] - Add option to create set a callback function for when a client connects or disconnects.
