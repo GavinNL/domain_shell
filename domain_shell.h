@@ -1,6 +1,34 @@
+/*
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * For more information, please refer to <http://unlicense.org>
+ */
+
 #pragma once
-#ifndef _SIMPLE_SHELL_H_
-#define _SIMPLE_SHELL_H_
+
+#ifndef _GNL_DOMAIN_SHELL_H_
+#define _GNL_DOMAIN_SHELL_H_
 
 #if defined __linux__
 
@@ -179,22 +207,78 @@ public:
     }
 
 
-
+    /**
+     * @brief AddOnConnect
+     * @param f
+     *
+     * Set the function to be called when a client connects.
+     * The function signature has the following prototype:
+     *
+     * void func_name(Unix_Socket & client)
+     */
     void AddOnConnect( connectfunction_t f)
     {
-        on_Connect = f;
+        m_onConnect = f;
     }
 
+    /**
+     * @brief AddOnDisconnect
+     * @param f
+     *
+     * Set the function to be called when a client disconnects.
+     * The function signature has the following prototype:
+     *
+     * void func_name(Unix_Socket & client)
+     */
     void AddOnDisconnect( disconnectfunction_t f)
     {
-        on_Disconnect = f;
+        m_onDisconnect = f;
     }
 
-    void AddCommand(std::string const & s, cmdfunction_t f)
+
+    /**
+     * @brief AddCommand
+     * @param command_name - name of the command
+     *
+     * Add a command function which will be called whenever a
+     * client types it into its terminal.
+     *
+     * The funciton prototype is:
+     *
+     * void func_name(Unix_Socket & client, char const * args)
+     *
+     * Example:
+     *
+     * shell.AddCommand("exit", exit_function);
+     *
+     *
+     *
+     */
+    void AddCommand(std::string const & command_name, cmdfunction_t f)
     {
-        m_cmds[s] = f;
+        m_cmds[command_name] = f;
     }
 
+    /**
+     * @brief AddDefaultCommand
+     * @param f
+     *
+     * Adds a command that will be called if the client types in a command
+     * that is not handled.
+     */
+    void AddDefaultCommand(cmdfunction_t f)
+    {
+        m_Default = f;
+    }
+
+    /**
+     * @brief Disconnect
+     * Disconnects all clients and destroy's the socket
+     */
+    void Disconnect()
+    {
+        __disconnect();
+    }
 
 private:
     void parse(const char * buffer, Unix_Socket & client)
@@ -211,7 +295,11 @@ private:
             while(buffer[i] == ' ')
                 ++i;
             it->second(client, &buffer[i]);
+            return;
         }
+
+        if(m_Default)
+            m_Default( client, buffer );
     }
 
 
@@ -222,8 +310,8 @@ private:
         char buffer[256];
 
         auto old_client = *p_Client;
-        if( on_Connect )
-            on_Connect(*p_Client);
+        if( m_onConnect )
+            m_onConnect(*p_Client);
 
         while( Client && !m_exit)
         {
@@ -238,8 +326,8 @@ private:
            // Client.Write(buffer, ret);
         }
 
-        if(on_Disconnect)
-            on_Disconnect(old_client);
+        if(m_onDisconnect)
+            m_onDisconnect(old_client);
 
         Client.Close();
         __erase_client(p_Client);
@@ -314,22 +402,25 @@ private:
 
         if(m_ListenThread.joinable() )
             m_ListenThread.join();
+
+        Unlink();
     }
 
 
     using pair_t = std::pair< std::thread, Unix_Socket >;
 
-    std::thread m_ListenThread;
-    std::string m_Name;
-    bool m_exit = false;
-    std::mutex m_Mutex;
+    std::thread          m_ListenThread;
+    std::string          m_Name;
+    bool                 m_exit = false;
+    std::mutex           m_Mutex;
     std::vector<pair_t*> m_Clients;
-    map_t m_cmds;
-    connectfunction_t on_Connect;
-    disconnectfunction_t on_Disconnect;
+    map_t                m_cmds;
+    cmdfunction_t        m_Default;
+    connectfunction_t    m_onConnect;
+    disconnectfunction_t m_onDisconnect;
 };
 #else
-    #error User a proper operating system!
+    #error This does not work on Windows yet!
 #endif
 
 #endif

@@ -33,10 +33,14 @@ socat - UNIX-CONNECT:/socket_path
 netcat -U /socket_path
 ```
 
-See the main.cpp example
+## Example ##
+
+See the [main.cpp](main.cpp) for a quick start on how to use Domain Shell
 
 
 ## Task List ##
 
 - [ ] - Add TCP sockets as well.
+
+
 
