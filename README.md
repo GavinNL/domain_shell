@@ -1,17 +1,36 @@
 # Domain Shell #
 
-A way to add shell type functionality to your project.
+Domain Shell is a simple library which allows you to add a shell to your
+application. The shell can be communicated with using an external application
+such as  ncat or socat.
 
-Communicate with your process using named Unix Socket.
+The library provides multi-client shell so multiple clients can connect to it
+at once.
 
-You can connect to the shell using an external application such as "socat"
+Domain Shell uses a Unix Domain socket to provide communication to the running
+process.
+
+Once the shell is running, you can connect to it using an external application
+like socat or netcat.
+
 
 ```bash
 sudo apt-get install soccat
 ```
 
 ```bash
+sudo apt-get install netcat
+```
+
+Connect to the socket using the command line:
+
+```bash
 socat - UNIX-CONNECT:/socket_path
+```
+
+
+```bash
+netcat -U /socket_path
 ```
 
 See the main.cpp example
@@ -19,4 +38,5 @@ See the main.cpp example
 
 ## Task List ##
 
-- [ ] - Add option to create set a callback function for when a client connects or disconnects.
+- [ ] - Add TCP sockets as well.
+

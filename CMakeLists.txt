@@ -5,7 +5,7 @@ aux_source_directory(. SRC_LIST)
 FILE(GLOB files    "./*.h"
                                  "./*.cpp"
                                  "./*.md"
-                                 ".gitignore" "makefile")
+                                 ".gitignore" "makefile" "LICENSE")
 
 add_custom_target(headers    SOURCES ${files})
 
