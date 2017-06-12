@@ -184,16 +184,27 @@ public:
 
     ~DomainShell()
     {
-        //std::cout << "Destroying" << std::endl;
         __disconnect();
         Unlink();
     }
 
+    /**
+     * @brief Unlink
+     *
+     * Unlinks the current socket name
+     */
     void Unlink()
     {
         unlink(m_Name.c_str());
     }
 
+    /**
+     * @brief Start
+     * @param name - the path of the socket to create in the filesystem
+     *
+     * Starts the shell and creates a socket in the filesystem which can be
+     * connected to via an external application.
+     */
     void Start( char const * name)
     {
         m_Name = name;
@@ -397,7 +408,8 @@ private:
             delete(c);
         }
 
-        //std::cout << "Closing Listen socket" << std::endl;
+        m_Clients.clear();
+
         m_Socket.Shutdown();
 
         if(m_ListenThread.joinable() )
