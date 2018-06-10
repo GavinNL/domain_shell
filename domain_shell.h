@@ -49,6 +49,7 @@
 #include <functional>
 #include <mutex>
 
+
 class Unix_Socket
 {
 public:
@@ -172,7 +173,7 @@ class DomainShell
 public:
     Unix_Socket m_Socket;
 
-    using cmdfunction_t = std::function<void(Unix_Socket&,char const * args)>;
+    using cmdfunction_t = std::function<std::string(std::vector<std::string>)>;
     using connectfunction_t = std::function<void(Unix_Socket&)>;
     using disconnectfunction_t = std::function<void(Unix_Socket&)>;
     using map_t      = std::map<std::string, cmdfunction_t >;
@@ -294,23 +295,12 @@ public:
 private:
     void parse(const char * buffer, Unix_Socket & client)
     {
-        char cmd[50];
-        std::sscanf(buffer,"%s",cmd);
-
-        std::string command(cmd);
-
-        auto it = m_cmds.find(cmd);
-        if(it!=m_cmds.end())
+        std::string S(buffer);
+        if(S.size()>0)
         {
-            int i=0;
-            while(buffer[i] == ' ')
-                ++i;
-            it->second(client, &buffer[i]);
-            return;
+            auto printout = call( S );
+            client.Write(printout.data(), printout.size());
         }
-
-        if(m_Default)
-            m_Default( client, buffer );
     }
 
 
@@ -334,7 +324,6 @@ private:
 
             buffer[ret] = 0;
             parse(buffer, Client);
-           // Client.Write(buffer, ret);
         }
 
         if(m_onDisconnect)
@@ -430,6 +419,135 @@ private:
     cmdfunction_t        m_Default;
     connectfunction_t    m_onConnect;
     disconnectfunction_t m_onDisconnect;
+
+public:
+
+
+    std::string call(std::string cmd)
+    {
+        if( cmd.back() == '\n') cmd.pop_back();
+        if( cmd.size() == 0)
+            return "";
+
+        int k = 0;
+
+        while( k < cmd.size() )
+        {
+            if( cmd[k] == '$' )
+            {
+                char brackets[] = "  ";
+                if( cmd[k+1] == '(')
+                {
+                    brackets[0]='('; brackets[1] = ')';
+                }
+                else if( cmd[k+1] == '{')
+                {
+                    brackets[0]='{'; brackets[1] = '}';
+                }
+                else
+                {
+                    k++;
+                    continue;
+                }
+
+                int m = k+2;
+
+                int bcount = 1;
+                while(bcount !=0 && m < cmd.size() )
+                {
+                    if( cmd[m]==brackets[0]) bcount++;
+                    if( cmd[m]==brackets[1]) bcount--;
+                    ++m;
+                }
+
+                if( brackets[0] == '(')
+                {
+                    auto new_call = cmd.substr(k+2, m-(k+2)-1 );
+                    auto ret = call( new_call );
+
+                    cmd.erase(k, m-(k+2)+2);
+                    cmd.insert(k, ret);
+                }
+                else if(brackets[0] == '{')
+                {
+                    auto new_call = cmd.substr(k+2, m-(k+2)-1 );
+                    auto var = get_var(new_call);
+                    cmd.erase(k, m-(k+2)+2);
+                    cmd.insert(k, var);
+                }
+            }
+            k++;
+        }
+        auto T = tokenize(cmd);
+        return execute( T );
+    }
+
+    std::string execute( std::vector< std::string > const & args )
+    {
+        auto f = m_cmds.find( args[0] );
+        if( f != m_cmds.end() )
+        {
+            auto ret = f->second( args  );
+            return ret;
+        } else {
+            return "Unknown command";
+        }
+    }
+
+
+    std::string get_var(std::string name)
+    {
+        return "temp";
+    }
+
+    std::vector<std::string> tokenize( std::string const & s)
+    {
+        std::vector<std::string> tokens;
+
+        std::string T;
+        for(int i=0;i<s.size();i++)
+        {
+           if( s[i]=='\\')
+           {
+               ++i;
+               T += s[i];
+               continue;
+           }
+           else
+           {
+               if( s[i] == '"')
+               {
+                   ++i;
+                   while(s[i] != '"')
+                   {
+                       if( s[i] == '\\')
+                       {
+                            i++;
+                            T += s[i];
+                       }
+                       else
+                       {
+                        T += s[i++];
+                       }
+                   }
+               }
+               else if( s[i] == ' ')
+               {
+                   if( T.size() != 0)
+                   {
+                     tokens.push_back(T);
+                     T = "";
+                   }
+               } else {
+                T += s[i];
+               }
+           }
+        }
+        if( T.size() !=0)
+            tokens.push_back(T);
+        return tokens;
+    }
+
 };
 #else
     #error This does not work on Windows yet!

@@ -27,24 +27,39 @@
 
 #define SOCKET_NAME "/tmp/mysocket.socket"
 
+#include <iostream>
 #include "domain_shell.h"
 
-#include <iostream>
-
-void cmd_exit(Unix_Socket & client, char const * args)
+std::string cmd_echo( std::vector<std::string> const & arg)
 {
-    const char msg[] = "From server: Good Bye!!\n";
+    std::string s;
+    for(int i=1; i < arg.size() ;i++)
+    {
+        s += arg[i] + " ";
+    }
 
-    client.Write(msg, sizeof(msg));
-
-    client.Close();
+    return s;
 }
 
-void cmd_none(Unix_Socket & client, char const * args)
+std::string cmd_ls( std::vector<std::string> const & arg)
 {
-    std::string response = "Server Received: ";
-    response += args;
-    client.Write(response.data(), response.size() );
+    std::string s("file.txt hello.txt");
+    return s;
+}
+
+std::string cmd_rand( std::vector<std::string> const & arg)
+{
+    return std::to_string( std::rand() );
+}
+
+std::string cmd_exit( std::vector<std::string> const & arg)
+{
+    return "From server: Good Bye!!\n";
+}
+
+std::string cmd_none( std::vector<std::string> const & arg )
+{
+    return "invalid command";
 }
 
 void on_connect(Unix_Socket & client)
@@ -70,7 +85,14 @@ int main()
 
     DomainShell S;
 
+
+
+    //S.call("ls $(file test)");
+    //return 0;
     S.AddCommand("exit", cmd_exit);
+    S.AddCommand("ls",   cmd_ls);
+    S.AddCommand("rand", cmd_rand);
+    S.AddCommand("echo", cmd_echo);
 
     S.AddOnConnect( on_connect );
     S.AddDefaultCommand(cmd_none);
