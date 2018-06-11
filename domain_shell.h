@@ -121,7 +121,6 @@ public:
 
   size_t Read(void * buffer, size_t size )
   {
-    //ssize_t ret = read(m_fd, buffer, size);
     ssize_t ret = recv(m_fd, buffer, size,  0);
     if(ret == -1 || ret == 0)
     {
@@ -133,7 +132,6 @@ public:
   size_t Write( void const * buffer , size_t size)
   {
     return send(m_fd, buffer, size, 0);
-    //return write(m_fd, buffer, size);
   }
 
   bool Shutdown()
@@ -180,9 +178,16 @@ public:
 
     DomainShell()
     {
-
+        AddCommand( "set", std::bind(&DomainShell::set_cmd, this ,std::placeholders::_1) );
+        AddCommand( "set", std::bind(&DomainShell::set_cmd, this ,std::placeholders::_1) );
     }
 
+    std::string set_cmd(std::vector<std::string> args)
+    {
+        if( args.size() >= 3)
+            set_var(args[1], args[2]);
+        return "";
+    }
     ~DomainShell()
     {
         __disconnect();
@@ -300,6 +305,7 @@ private:
         {
             auto printout = call( S );
             client.Write(printout.data(), printout.size());
+            client.Write("\nShell>> ", 9);
         }
     }
 
@@ -422,62 +428,64 @@ private:
 
 public:
 
+    static uint32_t find_closing_bracket(char const * c, char open, char close)
+    {
+        char const * s = c;
+        int b = 0;
+        while( c != 0 )
+        {
+            if( *c == close && b==0)
+                return c-s;
+
+            if(*c == open)  ++b;
+            if(*c == close) --b;
+
+            c++;
+        }
+
+        return 0;
+    }
 
     std::string call(std::string cmd)
     {
+
         if( cmd.back() == '\n') cmd.pop_back();
         if( cmd.size() == 0)
             return "";
 
-        int k = 0;
-
+        uint32_t k = 0;
         while( k < cmd.size() )
         {
-            if( cmd[k] == '$' )
+
+            if(cmd[k] == '$')
             {
-                char brackets[] = "  ";
-                if( cmd[k+1] == '(')
+                switch( cmd[k+1])
                 {
-                    brackets[0]='('; brackets[1] = ')';
-                }
-                else if( cmd[k+1] == '{')
-                {
-                    brackets[0]='{'; brackets[1] = '}';
-                }
-                else
-                {
-                    k++;
-                    continue;
-                }
-
-                int m = k+2;
-
-                int bcount = 1;
-                while(bcount !=0 && m < cmd.size() )
-                {
-                    if( cmd[m]==brackets[0]) bcount++;
-                    if( cmd[m]==brackets[1]) bcount--;
-                    ++m;
-                }
-
-                if( brackets[0] == '(')
-                {
-                    auto new_call = cmd.substr(k+2, m-(k+2)-1 );
-                    auto ret = call( new_call );
-
-                    cmd.erase(k, m-(k+2)+2);
-                    cmd.insert(k, ret);
-                }
-                else if(brackets[0] == '{')
-                {
-                    auto new_call = cmd.substr(k+2, m-(k+2)-1 );
-                    auto var = get_var(new_call);
-                    cmd.erase(k, m-(k+2)+2);
-                    cmd.insert(k, var);
+                    case '(':
+                    {
+                        uint32_t s = find_closing_bracket( &cmd[k+2], '(', ')');
+                        auto new_call = cmd.substr(k+2, s );
+                        auto ret = call( new_call );
+                        cmd.erase(k, s+3);
+                        cmd.insert(k, ret);
+                        break;
+                    }
+                    case '{':
+                    {
+                        uint32_t s = find_closing_bracket( &cmd[k+2], '{', '}');
+                        auto new_call = cmd.substr(k+2, s );
+                        auto ret = get_var(new_call);
+                        cmd.erase(k, s+3);
+                        cmd.insert(k, ret);
+                        break;
+                    }
+                    default:
+                        break;
                 }
             }
-            k++;
+            ++k;
         }
+        std::cout << "calling: " << cmd << std::endl;
         auto T = tokenize(cmd);
         return execute( T );
     }
@@ -494,10 +502,27 @@ public:
         }
     }
 
+    std::map<std::string, std::string> m_vars;
 
+    void set_var(std::string name, std::string value)
+    {
+        //std::cout << "setting var: " << name << "= " << value << std::endl;
+        m_vars[name] = value;
+    }
+    void unset_var(std::string name)
+    {
+        m_vars.erase(name);
+    }
     std::string get_var(std::string name)
     {
-        return "temp";
+        //std::cout << "getting var: " << name << std::endl;
+        auto f = m_vars.find(name);
+        if( f == m_vars.end())
+        {
+            return "";
+        } else {
+            return f->second;
+        }
     }
 
     std::vector<std::string> tokenize( std::string const & s)

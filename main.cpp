@@ -43,7 +43,7 @@ std::string cmd_echo( std::vector<std::string> const & arg)
 
 std::string cmd_ls( std::vector<std::string> const & arg)
 {
-    std::string s("file.txt hello.txt");
+    std::string s("file.txt\nhello.txt");
     return s;
 }
 
@@ -66,9 +66,10 @@ void on_connect(Unix_Socket & client)
 {
     std::cout << "Client connected" << std::endl;
 
-    const char msg[] = "Welcome to the Shell!\n"
-                       "- Any command you type will be echoed back.\n"
-                       "- type 'exit' to disconnect\n";
+    const char msg[] = "\033[1;31mbold red text\033[0m\n"
+                      "\033[1;31m"  "Welcome to the Shell!\n" "\033[0m"
+                      "\033[1;31m"  "- Any command you type will be echoed back.\n" "\033[0m"
+                      "\033[1;31m"  "- type 'exit' to disconnect\n" "\033[0m";
 
     client.Write(msg, sizeof(msg));
 }
@@ -85,10 +86,6 @@ int main()
 
     DomainShell S;
 
-
-
-    //S.call("ls $(file test)");
-    //return 0;
     S.AddCommand("exit", cmd_exit);
     S.AddCommand("ls",   cmd_ls);
     S.AddCommand("rand", cmd_rand);
